@@ -31,6 +31,7 @@ export interface Product {
   tags: string[];
   features?: string[];
   specifications?: Record<string, string>;
+  variants?: string[];
   createdAt: string;
   updatedAt: string;
 }

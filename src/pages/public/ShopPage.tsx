@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Filter, Grid, List, SlidersHorizontal } from 'lucide-react';
-import { productCategories } from '../../data/mockData';
+import { getProductCategories, fetchProducts } from '../../utils/api';
 import { ProductFilters, Product } from '../../data/types';
 import ProductCard from '../../components/common/ProductCard';
 import Button from '../../components/ui/Button';
@@ -15,39 +16,51 @@ const ShopPage: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Fetch products from the API
+  const [categories, setCategories] = useState<string[]>([]);
+  const location = useLocation();
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Fetch products and categories from the API
   useEffect(() => {
-    fetch('http://localhost:3002/api/products')
-      .then((response) => response.json())
-      .then((data) => {
-        // Transform database products to match frontend format
-        const transformedProducts = data.map((product: any) => ({
-          id: product.id.toString(),
-          name: product.name,
-          description: product.description,
-          price: product.price,
-          category: product.category,
-          images: [product.image],
-          inStock: product.stockQuantity > 0,
-          stockQuantity: product.stockQuantity,
-          rating: 4.5, // Default rating since it's not in database
-          reviewCount: 0, // Default review count
-          tags: [],
-          createdAt: product.created_at
-        }));
-        setProducts(transformedProducts);
+    const fetchData = async () => {
+      try {
+        const [productsData, categoriesData] = await Promise.all([
+          fetchProducts(),
+          getProductCategories()
+        ]);
+        setProducts(productsData);
+        setCategories(categoriesData);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
         setLoading(false);
-      })
-      .catch((error) => {
-        console.error('Error fetching products:', error);
-        setLoading(false);
-      });
+      }
+    };
+
+    fetchData();
   }, []);
+
+  // read `search` query param and keep in state so filtering reacts to navigation
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const q = params.get('search') || '';
+    setSearchQuery(q);
+  }, [location.search]);
 
   // Filter and sort products
   const filteredProducts = useMemo(() => {
     let filtered = [...products];
+
+    // Apply free-text search query if present (from search bar)
+    if (searchQuery && searchQuery.trim().length > 0) {
+      const q = searchQuery.trim().toLowerCase();
+      filtered = filtered.filter(product => {
+        const name = (product.name || '').toLowerCase();
+        const desc = (product.description || '').toLowerCase();
+        const category = (product.category || '').toLowerCase();
+        return name.includes(q) || desc.includes(q) || category.includes(q);
+      });
+    }
 
     // Apply category filter
     if (filters.category) {
@@ -141,7 +154,7 @@ const ShopPage: React.FC = () => {
               <div className="mb-6">
                 <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Category</h4>
                 <div className="space-y-2">
-                  {productCategories.map((category) => (
+                  {categories.map((category: string) => (
                     <label key={category} className="flex items-center">
                       <input
                         type="radio"

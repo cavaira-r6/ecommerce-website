@@ -10,7 +10,7 @@ import {
   X,
   Plus,
   Edit,
- Trash2,
+  Trash2,
   Save
 } from 'lucide-react';
 
@@ -42,15 +42,19 @@ interface Order {
   payment_method: string;
   created_at: string;
 }
-
 // Dashboard components
 const DashboardOverview = () => {
+  const [sending, setSending] = useState(false);
+  const [productName, setProductName] = useState('');
+  const [productUrl, setProductUrl] = useState('');
+  const [result, setResult] = useState<string | null>(null);
+  
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-4">MiniU Admin Dashboard</h1>
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Welcome to MiniU Admin Panel</h2>
-        <p className="text-gray-600 mb-4">Manage your products, orders, and users from this dashboard.</p>
+      <h1 className="text-2xl font-bold text-white mb-4">MiniU Admin Dashboard</h1>
+      <div className="bg-gray-800/80 backdrop-blur-sm p-6 rounded-lg shadow-sm border border-gray-700">
+        <h2 className="text-lg font-semibold text-white mb-4">Welcome to MiniU Admin Panel</h2>
+        <p className="text-gray-400 mb-4">Manage your products, orders, and users from this dashboard.</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="p-4 border rounded-lg">
             <h3 className="font-medium text-gray-900">Products</h3>
@@ -65,6 +69,52 @@ const DashboardOverview = () => {
             <p className="text-sm text-gray-600">Manage user accounts and permissions</p>
           </div>
         </div>
+        <div className="mt-8 border-t pt-6">
+          <h3 className="font-medium text-gray-900 mb-2">Send Product Drop Newsletter</h3>
+          <div className="flex flex-col sm:flex-row gap-4 mb-2">
+            <input
+              type="text"
+              placeholder="Product Name"
+              value={productName}
+              onChange={e => setProductName(e.target.value)}
+              className="border px-3 py-2 rounded-md flex-1"
+            />
+            <input
+              type="text"
+              placeholder="Product URL"
+              value={productUrl}
+              onChange={e => setProductUrl(e.target.value)}
+              className="border px-3 py-2 rounded-md flex-1"
+            />
+            <button
+              className="bg-blue-600 text-white px-4 py-2 rounded-md"
+              disabled={sending || !productName || !productUrl}
+              onClick={async () => {
+                setSending(true);
+                setResult(null);
+                try {
+                  const res = await fetch('http://localhost:3002/api/newsletter/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ productName, productUrl })
+                  });
+                  const data = await res.json();
+                  if (data.success) {
+                    setResult(`Sent to ${data.sent} subscribers. Failed: ${data.failed}`);
+                  } else {
+                    setResult(data.error || 'Failed to send.');
+                  }
+                } catch (err) {
+                  setResult('Network error.');
+                }
+                setSending(false);
+              }}
+            >
+              {sending ? 'Sending...' : 'Send Newsletter'}
+            </button>
+          </div>
+          {result && <div className="text-sm mt-2 text-gray-700">{result}</div>}
+        </div>
       </div>
     </div>
   );
@@ -73,15 +123,8 @@ const DashboardOverview = () => {
 const ProductsManager = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [editProduct, setEditProduct] = useState({
-    name: '',
-    description: '',
-    price: '',
-    category: '',
-    image: '',
-    stockQuantity: ''
-  });
   const [newProduct, setNewProduct] = useState({
     name: '',
     description: '',
@@ -175,17 +218,58 @@ const ProductsManager = () => {
         
         if (response.ok) {
           fetchProducts();
+          alert('Product deleted successfully!');
         }
       } catch (error) {
         console.error('Error deleting product:', error);
+        alert('Error deleting product. Please try again.');
       }
+    }
+  };
+
+  const handleEditProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+
+    try {
+      const formData = new FormData();
+      formData.append('name', editingProduct.name);
+      formData.append('description', editingProduct.description);
+      formData.append('price', editingProduct.price.toString());
+      formData.append('category', editingProduct.category);
+      formData.append('stockQuantity', editingProduct.stockQuantity.toString());
+      
+      if (selectedImage) {
+        formData.append('image', selectedImage);
+      }
+      
+      const response = await fetch(`http://localhost:3002/api/admin/products/${editingProduct.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        },
+        body: formData
+      });
+      
+      if (response.ok) {
+        setShowEditForm(false);
+        setEditingProduct(null);
+        fetchProducts();
+        alert('Product updated successfully!');
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to update product: ${errorData.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error updating product:', error);
+      alert('Error updating product. Please check your connection and try again.');
     }
   };
 
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Products Management</h1>
+        <h1 className="text-2xl font-bold text-white">Products Management</h1>
         <button
           onClick={() => setShowAddForm(true)}
           className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center gap-2"
@@ -195,16 +279,112 @@ const ProductsManager = () => {
         </button>
       </div>
 
+      {showEditForm && editingProduct && (
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border mb-6">
+          <h2 className="text-lg font-semibold mb-4">Edit Product</h2>
+          <form onSubmit={handleEditProduct} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input
+              type="text"
+              placeholder="Product Name"
+              value={editingProduct.name}
+              onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
+              className="border rounded-md px-3 py-2 dark:bg-gray-700 dark:border-gray-600"
+              required
+            />
+            <input
+              type="number"
+              step="0.01"
+              placeholder="Price"
+              value={editingProduct.price}
+              onChange={(e) => setEditingProduct({ ...editingProduct, price: parseFloat(e.target.value) })}
+              className="border rounded-md px-3 py-2 dark:bg-gray-700 dark:border-gray-600"
+              required
+            />
+            <input
+              type="text"
+              placeholder="Category"
+              value={editingProduct.category}
+              onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
+              className="border rounded-md px-3 py-2 dark:bg-gray-700 dark:border-gray-600"
+              required
+            />
+            <input
+              type="number"
+              placeholder="Stock Quantity"
+              value={editingProduct.stockQuantity}
+              onChange={(e) => setEditingProduct({ ...editingProduct, stockQuantity: parseInt(e.target.value) })}
+              className="border rounded-md px-3 py-2 dark:bg-gray-700 dark:border-gray-600"
+              required
+            />
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Product Image
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="border rounded-md px-3 py-2 w-full dark:bg-gray-700 dark:border-gray-600"
+              />
+              {imagePreview ? (
+                <div className="mt-2">
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    className="h-20 w-20 object-cover rounded-md"
+                  />
+                </div>
+              ) : editingProduct.image && (
+                <div className="mt-2">
+                  <img
+                    src={editingProduct.image?.startsWith('http') ? editingProduct.image : `http://localhost:3002${editingProduct.image}`}
+                    alt="Current"
+                    className="h-20 w-20 object-cover rounded-md"
+                  />
+                </div>
+              )}
+            </div>
+            <textarea
+              placeholder="Description"
+              value={editingProduct.description}
+              onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
+              className="border rounded-md px-3 py-2 md:col-span-2 h-24 dark:bg-gray-700 dark:border-gray-600"
+              required
+            />
+            <div className="md:col-span-2 flex gap-2">
+              <button
+                type="submit"
+                className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center gap-2"
+              >
+                <Save className="h-4 w-4" />
+                Update Product
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEditForm(false);
+                  setEditingProduct(null);
+                }}
+                className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 flex items-center gap-2"
+              >
+                <X className="h-4 w-4" />
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {showAddForm && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border mb-6">
-          <h2 className="text-lg font-semibold mb-4">Add New Product</h2>
+        <div className="bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-700 mb-6">
+          <h2 className="text-lg font-semibold text-white mb-4">Add New Product</h2>
           <form onSubmit={handleAddProduct} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input
               type="text"
               placeholder="Product Name"
               value={newProduct.name}
               onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-              className="border rounded-md px-3 py-2"
+              className="border border-gray-600 bg-gray-700 text-white px-3 py-2 rounded-md placeholder-gray-400"
               required
             />
             <input
@@ -286,14 +466,14 @@ const ProductsManager = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Product</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Category</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Price</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Stock</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-gray-800 divide-y divide-gray-700">
               {products.map((product) => (
                 <tr key={product.id}>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -304,17 +484,23 @@ const ProductsManager = () => {
                         alt={product.name} 
                       />
                       <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">{product.name}</div>
-                        <div className="text-sm text-gray-500">{product.description?.substring(0, 50)}...</div>
+                        <div className="text-sm font-medium text-white">{product.name}</div>
+                        <div className="text-sm text-gray-400">{product.description?.substring(0, 50)}...</div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{product.category}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${product.price}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{product.stockQuantity}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{product.category}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">${product.price}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{product.stockQuantity}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex gap-2">
-                      <button className="text-indigo-600 hover:text-indigo-900">
+                      <button 
+                        onClick={() => {
+                          setEditingProduct(product);
+                          setShowEditForm(true);
+                        }}
+                        className="text-indigo-600 hover:text-indigo-900"
+                      >
                         <Edit className="h-4 w-4" />
                       </button>
                       <button 
@@ -337,6 +523,15 @@ const ProductsManager = () => {
 
 const OrdersManager = () => {
   const [orders, setOrders] = useState<Order[]>([]);
+  
+  // Add dark mode styles
+  const tableStyles = {
+    container: "bg-gray-800 rounded-lg shadow-sm border border-gray-700",
+    header: "bg-gray-900",
+    headerText: "text-gray-400",
+    row: "bg-gray-800 border-gray-700",
+    cell: "text-gray-300",
+  };
 
   useEffect(() => {
     fetchOrders();
@@ -360,25 +555,25 @@ const OrdersManager = () => {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-4">Orders Management</h1>
-      <div className="bg-white rounded-lg shadow-sm border">
+      <h1 className="text-2xl font-bold text-white mb-4">Orders Management</h1>
+      <div className="bg-gray-800 rounded-lg shadow-sm border border-gray-700">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-700">
+            <thead className="bg-gray-900">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Order ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Customer</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Total</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-gray-800 divide-y divide-gray-700">
               {orders.map((order) => (
                 <tr key={order.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{order.id}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.customer_email}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${order.total}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300">#{order.id}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{order.customer_email}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">${order.total}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                       order.status === 'completed' ? 'bg-green-100 text-green-800' :
@@ -426,23 +621,23 @@ const UsersManager = () => {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-4">Users Management</h1>
-      <div className="bg-white rounded-lg shadow-sm border">
+      <h1 className="text-2xl font-bold text-white mb-4">Users Management</h1>
+      <div className="bg-gray-800 rounded-lg shadow-sm border border-gray-700">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-gray-700">
+            <thead className="bg-gray-900">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">User</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Email</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Role</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Joined</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-gray-800 divide-y divide-gray-700">
               {users.map((user) => (
                 <tr key={user.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{user.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.email}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-300">{user.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{user.email}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                       user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
@@ -465,14 +660,19 @@ const UsersManager = () => {
 
 const StatsPage = () => (
   <div className="p-6">
-    <h1 className="text-2xl font-bold text-gray-900 mb-4">Statistics</h1>
-    <p className="text-gray-600">View detailed analytics and reports here.</p>
+    <h1 className="text-2xl font-bold text-white mb-4">Statistics</h1>
+    <p className="text-gray-400">View detailed analytics and reports here.</p>
   </div>
 );
 
 const AdminDashboard: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+
+  // Set dark mode by default
+  useEffect(() => {
+    document.documentElement.classList.add('dark');
+  }, []);
 
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard, current: location.pathname === '/admin' },
@@ -483,8 +683,8 @@ const AdminDashboard: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="flex">
+    <div className="min-h-screen bg-gray-900 text-white relative">
+      <div className="flex relative z-0">
         {/* Mobile sidebar overlay */}
         {sidebarOpen && (
           <div className="fixed inset-0 z-40 lg:hidden">
@@ -493,11 +693,11 @@ const AdminDashboard: React.FC = () => {
         )}
 
         {/* Sidebar */}
-        <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform ${
+        <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-gray-800/90 backdrop-blur-sm shadow-lg transform ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}>
-          <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
-            <h2 className="text-xl font-bold text-gray-900">Admin Panel</h2>
+          <div className="flex items-center justify-between h-16 px-6 border-b border-gray-700">
+            <h2 className="text-xl font-bold text-white">Admin Panel</h2>
             <button
               onClick={() => setSidebarOpen(false)}
               className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-600"
@@ -516,8 +716,8 @@ const AdminDashboard: React.FC = () => {
                     to={item.href}
                     className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md ${
                       item.current
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                        ? 'bg-blue-900 text-blue-200'
+                        : 'text-gray-300 hover:bg-gray-700 hover:text-white'
                     }`}
                     onClick={() => setSidebarOpen(false)}
                   >
@@ -533,7 +733,7 @@ const AdminDashboard: React.FC = () => {
         {/* Main content */}
         <div className="flex-1 lg:ml-0">
           {/* Top bar */}
-          <div className="bg-white shadow-sm border-b border-gray-200 lg:hidden">
+          <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 lg:hidden">
             <div className="flex items-center justify-between h-16 px-4">
               <button
                 onClick={() => setSidebarOpen(true)}

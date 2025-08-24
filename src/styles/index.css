@@ -10,8 +10,13 @@
   }
   
   body {
-    @apply bg-white text-gray-900;
+    @apply bg-transparent text-gray-900;
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Keep body transparent in dark mode so the background Canvas shows through */
+  .dark body {
+    @apply bg-transparent text-white;
   }
 }
 
@@ -117,4 +122,11 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.clip-hexagon {
+  clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0% 50%);
 }

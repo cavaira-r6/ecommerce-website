@@ -9,12 +9,11 @@ import {
   LogOut,
   Settings,
   Package,
-  Sun,
-  Moon
+  Heart
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useAuth, useIsAuthenticated, useIsAdmin } from '../../contexts/AuthContext';
 import { useCartItemCount } from '../../contexts/CartContext';
-import { useTheme } from '../../contexts/ThemeContext';
 import SearchBar from '../common/SearchBar';
 import Button from '../ui/Button';
 
@@ -25,7 +24,6 @@ const Navbar: React.FC = () => {
   const isAdmin = useIsAdmin();
   const cartItemCount = useCartItemCount();
   const { state, logout } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -42,14 +40,19 @@ const Navbar: React.FC = () => {
   ];
 
   return (
-    <nav className="bg-white dark:bg-black border-b border-gray-200 dark:border-gray-800 sticky top-0 z-40">
+    <motion.nav 
+      className="sticky top-0 z-40 bg-gradient-to-b from-black/90 to-gray-900/90 backdrop-blur-lg border-b border-gray-800/20"
+      initial={{ y: -100, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.6 }}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+        <div className="flex justify-between items-center h-20">
           {/* Logo */}
           <div className="flex-shrink-0">
-            <Link to="/" className="flex items-center">
-              <Package className="h-8 w-8 text-gray-900 dark:text-white" />
-              <span className="ml-2 text-xl font-bold text-gray-900 dark:text-white">
+            <Link to="/" className="flex items-center group">
+              <Package className="h-8 w-8 bg-gradient-to-br from-blue-500 to-purple-500 text-white p-1.5 rounded-xl transform group-hover:scale-110 transition-transform duration-300" />
+              <span className="ml-2 text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
                 MiniU
               </span>
             </Link>
@@ -57,14 +60,15 @@ const Navbar: React.FC = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:block">
-            <div className="ml-10 flex items-baseline space-x-4">
+            <div className="ml-10 flex items-baseline space-x-6">
               {navLinks.map((link) => (
                 <Link
                   key={link.name}
                   to={link.href}
-                  className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  className="relative text-gray-400 hover:text-blue-400 px-3 py-2 text-sm font-medium transition-all duration-300 group"
                 >
                   {link.name}
+                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300"></span>
                 </Link>
               ))}
             </div>
@@ -76,28 +80,21 @@ const Navbar: React.FC = () => {
           </div>
 
           {/* Right side items */}
-          <div className="flex items-center space-x-4">
-            {/* Theme Toggle */}
-            <button
-              onClick={toggleTheme}
-              className="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
-              aria-label="Toggle theme"
-            >
-              {theme === 'light' ? (
-                <Moon className="h-6 w-6" />
-              ) : (
-                <Sun className="h-6 w-6" />
-              )}
-            </button>
-
+          <div className="flex items-center space-x-6">
             {/* Cart */}
             <Link
-              to="/cart"
-              className="relative p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+              to="/wishlist"
+              className="relative p-2 text-gray-400 hover:text-blue-400 transition-all duration-300 rounded-xl hover:bg-gray-800 group"
             >
-              <ShoppingCart className="h-6 w-6" />
+              <Heart className="h-6 w-6 transform group-hover:scale-110 transition-transform duration-300" />
+            </Link>
+            <Link
+              to="/cart"
+              className="relative p-2 text-gray-400 hover:text-blue-400 transition-all duration-300 rounded-xl hover:bg-gray-800 group"
+            >
+              <ShoppingCart className="h-6 w-6 transform group-hover:scale-110 transition-transform duration-300" />
               {cartItemCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                <span className="absolute -top-1 -right-1 bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold shadow-lg transform scale-100 group-hover:scale-110 transition-transform duration-300">
                   {cartItemCount}
                 </span>
               )}
@@ -108,61 +105,65 @@ const Navbar: React.FC = () => {
               <div className="relative">
                 <button
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  className="flex items-center space-x-2 p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                  className="flex items-center space-x-2 p-2 text-gray-400 hover:text-blue-400 transition-all duration-300 rounded-xl hover:bg-gray-800 group"
                 >
                   {state.user?.avatar ? (
                     <img
                       src={state.user.avatar}
                       alt={state.user.name}
-                      className="h-6 w-6 rounded-full"
+                      className="h-8 w-8 rounded-lg object-cover transform group-hover:scale-110 transition-transform duration-300 ring-2 ring-blue-500/30"
                     />
                   ) : (
-                    <User className="h-6 w-6" />
+                    <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center transform group-hover:scale-110 transition-transform duration-300">
+                      <User className="h-5 w-5 text-white" />
+                    </div>
                   )}
-                  <span className="hidden md:block text-sm font-medium text-gray-900 dark:text-white">
+                  <span className="hidden md:block text-sm font-medium">
                     {state.user?.name}
                   </span>
                 </button>
 
                 {/* User Dropdown */}
                 {isUserMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-900 rounded-md shadow-lg py-1 z-50 border border-gray-200 dark:border-gray-700">
-                    <div className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
-                      <p className="font-medium text-gray-900 dark:text-white">{state.user?.name}</p>
-                      <p className="text-gray-500 dark:text-gray-400">{state.user?.email}</p>
+                  <div className="absolute right-0 mt-2 w-64 bg-black/95 rounded-2xl shadow-xl py-2 z-50 border border-gray-700/30 backdrop-blur-lg">
+                    <div className="px-4 py-3 text-sm border-b border-gray-800/50">
+                      <p className="font-medium bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
+                        {state.user?.name}
+                      </p>
+                      <p className="text-gray-500 text-xs mt-1">{state.user?.email}</p>
                     </div>
                     
                     {isAdmin && (
                       <Link
                         to="/admin"
-                        className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        className="flex items-center px-4 py-2.5 text-sm text-gray-400 hover:bg-gray-800/50 transition-all duration-300 group"
                         onClick={() => setIsUserMenuOpen(false)}
                       >
-                        <Settings className="h-4 w-4 mr-2" />
+                        <Settings className="h-4 w-4 mr-3 text-blue-400 transform group-hover:rotate-90 transition-transform duration-300" />
                         Admin Dashboard
                       </Link>
                     )}
                     
                     <button
                       onClick={handleLogout}
-                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      className="w-full flex items-center px-4 py-2.5 text-sm text-gray-400 hover:bg-gray-800/50 transition-all duration-300 group"
                     >
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Sign Out
+                      <LogOut className="h-4 w-4 mr-3 text-blue-400 transform group-hover:translate-x-1 transition-transform duration-300" />
+                      Sign out
                     </button>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-4">
                 <Link to="/login">
-                  <Button variant="ghost" size="sm" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
-                    Sign In
+                  <Button variant="ghost" size="sm">
+                    Sign in
                   </Button>
                 </Link>
                 <Link to="/signup">
-                  <Button size="sm" className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200">
-                    Sign Up
+                  <Button variant="primary" size="sm">
+                    Sign up
                   </Button>
                 </Link>
               </div>
@@ -171,7 +172,7 @@ const Navbar: React.FC = () => {
             {/* Mobile menu button */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+              className="md:hidden p-2 text-gray-400 hover:text-blue-400 transition-colors rounded-xl hover:bg-gray-800"
             >
               {isMobileMenuOpen ? (
                 <X className="h-6 w-6" />
@@ -182,57 +183,36 @@ const Navbar: React.FC = () => {
           </div>
         </div>
 
-        {/* Mobile Navigation */}
+        {/* Mobile menu */}
         {isMobileMenuOpen && (
-          <div className="md:hidden">
-            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 border-t border-gray-200 dark:border-gray-800">
-              {/* Search Bar Mobile */}
-              <div className="mb-3">
-                <SearchBar />
-              </div>
-
-              {/* Navigation Links */}
+          <div className="md:hidden py-4">
+            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
               {navLinks.map((link) => (
                 <Link
                   key={link.name}
                   to={link.href}
-                  className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white block px-3 py-2 rounded-md text-base font-medium transition-colors"
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="block px-3 py-2 rounded-lg text-gray-400 hover:text-blue-400 hover:bg-gray-800 transition-colors text-sm font-medium"
                 >
                   {link.name}
                 </Link>
               ))}
-
-              {/* Mobile Auth Links */}
-              {!isAuthenticated && (
-                <div className="pt-4 pb-3 border-t border-gray-200 dark:border-gray-800">
-                  <div className="flex items-center space-x-3">
-                    <Link to="/login" onClick={() => setIsMobileMenuOpen(false)}>
-                      <Button variant="ghost" size="sm" className="w-full text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
-                        Sign In
-                      </Button>
-                    </Link>
-                    <Link to="/signup" onClick={() => setIsMobileMenuOpen(false)}>
-                      <Button size="sm" className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200">
-                        Sign Up
-                      </Button>
-                    </Link>
-                  </div>
+              <Link
+                to="/wishlist"
+                className="block px-3 py-2 rounded-lg text-gray-400 hover:text-blue-400 hover:bg-gray-800 transition-colors text-sm font-medium"
+              >
+                <div className="flex items-center">
+                  <Heart className="h-5 w-5 mr-2" />
+                  Wishlist
                 </div>
-              )}
+              </Link>
+            </div>
+            <div className="px-2 pt-4">
+              <SearchBar />
             </div>
           </div>
         )}
       </div>
-
-      {/* Click outside to close user menu */}
-      {isUserMenuOpen && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setIsUserMenuOpen(false)}
-        />
-      )}
-    </nav>
+    </motion.nav>
   );
 };
 

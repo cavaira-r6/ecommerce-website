@@ -8,12 +8,66 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync, mkdirSync } from 'fs';
 import nodemailer from 'nodemailer';
+import timeout from 'connect-timeout';
+import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-const app = express();
 const PORT = process.env.PORT || 3002;
+
+// Initialize express app
+const app = express();
+
+// Security middleware
+app.use(helmet());
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
+});
+app.use('/api/', limiter);
+
+// Request timeout middleware
+app.use(timeout('30s'));
+app.use((req, res, next) => {
+  if (!req.timedout) next();
+});
+
+// Basic middleware
+app.use(express.json());
+
+// Enhanced CORS configuration
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? process.env.FRONTEND_URL 
+    : 'http://localhost:5173',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
+// Enhanced CORS configuration
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? 'https://your-production-domain.com' 
+    : 'http://localhost:3000',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
+// Global error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(err.status || 500).json({
+    success: false,
+    error: process.env.NODE_ENV === 'production' 
+      ? 'Internal server error' 
+      : err.message
+  });
+});
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -47,9 +101,9 @@ const upload = multer({
   }
 });
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+// Import and use payment routes
+import paymentRoutes from './routes/payment.js';
+app.use('/api/payment', paymentRoutes);
 // Serve uploaded images statically
 app.use('/uploads', express.static(uploadsDir));
 
@@ -107,8 +161,8 @@ db.serialize(() => {
   });
 });
 
-// JWT Secret (in production, use environment variable)
-const JWT_SECRET = 'your-secret-key-change-in-production';
+// JWT Secret from environment variable
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 // Helper function to generate JWT token
 const generateToken = (user) => {
@@ -300,7 +354,26 @@ app.get('/api/products', (req, res) => {
     if (err) {
       return res.status(500).json({ success: false, error: 'Database error' });
     }
-    res.json(rows);
+    // Transform products to match frontend type
+    const transformedProducts = rows.map(product => ({
+      id: product.id.toString(),
+      name: product.name,
+      description: product.description,
+      price: product.price,
+      originalPrice: product.original_price,
+      category: product.category,
+      images: [product.image],
+      inStock: product.stockQuantity > 0,
+      stockQuantity: product.stockQuantity,
+      rating: product.rating || 4.5,
+      reviewCount: product.reviewCount || 0,
+      tags: [],
+      features: product.features ? JSON.parse(product.features) : [],
+      specifications: product.specifications ? JSON.parse(product.specifications) : {},
+      createdAt: product.created_at,
+      updatedAt: product.updated_at
+    }));
+    res.json(transformedProducts);
   });
 });
 
@@ -336,6 +409,89 @@ app.get('/api/admin/stats', verifyAdmin, (req, res) => {
         });
       }
     });
+  });
+});
+
+// Get product by ID
+app.get('/api/products/:id', (req, res) => {
+  const id = req.params.id;
+  db.get("SELECT * FROM products WHERE id = ?", [id], (err, row) => {
+    if (err) {
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
+    if (!row) {
+      return res.status(404).json({ success: false, error: 'Product not found' });
+    }
+    // Transform product to match frontend type
+    const transformedProduct = {
+      id: row.id.toString(),
+      name: row.name,
+      description: row.description,
+      price: row.price,
+      originalPrice: row.original_price,
+      category: row.category,
+      images: [row.image],
+      inStock: row.stockQuantity > 0,
+      stockQuantity: row.stockQuantity,
+      rating: row.rating || 4.5,
+      reviewCount: row.reviewCount || 0,
+      tags: [],
+      features: row.features ? JSON.parse(row.features) : [],
+      specifications: row.specifications ? JSON.parse(row.specifications) : {},
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+    res.json(transformedProduct);
+  });
+});
+
+// Search products
+app.get('/api/products/search', (req, res) => {
+  const query = req.query.q;
+  if (!query) {
+    return res.status(400).json({ success: false, error: 'Search query is required' });
+  }
+
+  const searchTerm = `%${query}%`;
+  db.all(
+    "SELECT * FROM products WHERE name LIKE ? OR description LIKE ? OR category LIKE ?",
+    [searchTerm, searchTerm, searchTerm],
+    (err, rows) => {
+      if (err) {
+        return res.status(500).json({ success: false, error: 'Database error' });
+      }
+      // Transform products to match frontend type
+      const transformedProducts = rows.map(product => ({
+        id: product.id.toString(),
+        name: product.name,
+        description: product.description,
+        price: product.price,
+        originalPrice: product.original_price,
+        category: product.category,
+        images: [product.image],
+        inStock: product.stockQuantity > 0,
+        stockQuantity: product.stockQuantity,
+        rating: product.rating || 4.5,
+        reviewCount: product.reviewCount || 0,
+        tags: [],
+        features: product.features ? JSON.parse(product.features) : [],
+        specifications: product.specifications ? JSON.parse(product.specifications) : {},
+        createdAt: product.created_at,
+        updatedAt: product.updated_at
+      }));
+      res.json(transformedProducts);
+    }
+  );
+});
+
+// Get product categories
+app.get('/api/products/categories', (req, res) => {
+  db.all("SELECT DISTINCT category FROM products", (err, rows) => {
+    if (err) {
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
+    const categories = rows.map(row => row.category);
+    res.json(categories);
   });
 });
 
@@ -517,3 +673,82 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/api/health`);
 }); 
+// Create newsletter table if not exists
+db.run(`
+  CREATE TABLE IF NOT EXISTS newsletter (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT UNIQUE NOT NULL,
+    subscribed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+`);
+
+// Newsletter signup endpoint
+app.post('/api/newsletter', (req, res) => {
+  const { email } = req.body;
+  if (!email || !/^[^@]+@[^@]+\.[^@]+$/.test(email)) {
+    return res.status(400).json({ success: false, error: 'Invalid email address' });
+  }
+  db.run(
+    'INSERT OR IGNORE INTO newsletter (email) VALUES (?)',
+    [email],
+    function (err) {
+      if (err) {
+        return res.status(500).json({ success: false, error: 'Database error' });
+      }
+      if (this.changes === 0) {
+        return res.status(200).json({ success: true, message: 'Already subscribed' });
+      }
+      res.json({ success: true, message: 'Subscribed successfully' });
+    }
+  );
+});
+// Send product drop email to all newsletter subscribers
+app.post('/api/newsletter/send', async (req, res) => {
+  const { productName, productUrl } = req.body;
+  if (!productName || !productUrl) {
+    return res.status(400).json({ success: false, error: 'Missing product info' });
+  }
+
+  // Get all newsletter emails
+  db.all('SELECT email FROM newsletter', async (err, rows) => {
+    if (err) {
+      return res.status(500).json({ success: false, error: 'Database error' });
+    }
+    if (!rows.length) {
+      return res.status(400).json({ success: false, error: 'No subscribers found' });
+    }
+
+    // Get user names for personalization
+    db.all('SELECT email, name FROM users', async (err2, userRows) => {
+      const userMap = {};
+      if (!err2 && userRows) {
+        userRows.forEach(u => userMap[u.email] = u.name);
+      }
+
+      let sent = 0, failed = 0;
+      for (const { email } of rows) {
+        const name = userMap[email] || 'Subscriber';
+        const mailOptions = {
+          from: process.env.EMAIL_USER || 'your-email@gmail.com',
+          to: email,
+          subject: `New Product Drop: ${productName}`,
+          html: `
+            <h2>Hello ${name},</h2>
+            <p>We're excited to announce a new product: <strong>${productName}</strong>!</p>
+            <p><a href="${productUrl}">Click here to check it out</a></p>
+            <p>Thank you for subscribing to our newsletter!</p>
+            <hr>
+            <p><small>This message was sent from the MiniU newsletter.</small></p>
+          `
+        };
+        try {
+          await transporter.sendMail(mailOptions);
+          sent++;
+        } catch (e) {
+          failed++;
+        }
+      }
+      res.json({ success: true, sent, failed });
+    });
+  });
+});
