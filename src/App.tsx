@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Suspense } from "react";
 import { createBrowserRouter, RouterProvider, createRoutesFromElements, Route, Outlet } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CartProvider } from "./contexts/CartContext";
@@ -9,8 +9,8 @@ import Layout from "./components/layout/Layout";
 
 // Pages
 import HomePage from "./pages/public/HomePage";
-import ShopPage from "./pages/public/ShopPage";
-import ProductDetailPage from "./pages/public/ProductDetailPage";
+const ShopPage = React.lazy(() => import("./pages/public/ShopPage"));
+const ProductDetailPage = React.lazy(() => import("./pages/public/ProductDetailPage"));
 import CartPage from "./pages/public/CartPage";
 import WishlistPage from "./pages/public/WishlistPage";
 import CheckoutPage from "./pages/public/CheckoutPage";
@@ -29,13 +29,14 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 import AdminRoute from "./routes/AdminRoute";
 
 function App() {
+  const base = (import.meta as any).env?.BASE_URL || '/';
   const router = createBrowserRouter(
     createRoutesFromElements(
       <Route element={<Layout><Outlet /></Layout>}>
         {/* Public Routes */}
         <Route path="/" element={<HomePage />} />
-        <Route path="/shop" element={<ShopPage />} />
-        <Route path="/product/:id" element={<ProductDetailPage />} />
+  <Route path="/shop" element={<Suspense fallback={<div /> }><ShopPage /></Suspense>} />
+  <Route path="/product/:id" element={<Suspense fallback={<div /> }><ProductDetailPage /></Suspense>} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/checkout/success" element={<CheckoutSuccess />} />
         <Route path="/checkout/failure" element={<CheckoutFailure />} />
@@ -85,7 +86,7 @@ function App() {
       </Route>
     ),
     {
-      basename: "/",
+      basename: base,
       future: {
         v7_relativeSplatPath: true,
       },

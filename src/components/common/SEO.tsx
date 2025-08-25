@@ -1,6 +1,6 @@
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
-import { metaConfig } from '../config/meta';
+import { metaConfig } from '../../config/meta';
 
 interface SEOProps {
   page: keyof typeof metaConfig;

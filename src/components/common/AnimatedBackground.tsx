@@ -13,7 +13,11 @@ type FloatingModel = {
   floatIntensity: number;
 };
 
-const MODEL_URLS = ["/models/8.glb", "/models/80.glb", "/models/9.glb", "/models/3.glb", "/models/5.glb", "/models/26.glb", "/models/33.glb", "/models/13.glb"];
+// use Vite base so assets resolve correctly when app is served from a subpath
+const BASE_URL = ((import.meta as any).env && (import.meta as any).env.BASE_URL) || '/';
+const joinUrl = (base: string, p: string) => `${base.replace(/\/$/, '')}/${p.replace(/^\//, '')}`;
+const MODEL_FILES = ["models/8.glb", "models/80.glb", "models/9.glb", "models/3.glb", "models/5.glb", "models/26.glb", "models/33.glb", "models/13.glb"];
+const MODEL_URLS = MODEL_FILES.map((f) => joinUrl(BASE_URL, f));
 // number of model instances to spawn (reduced to keep scene lighter)
 const INSTANCE_COUNT = 24;
 
